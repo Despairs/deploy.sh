@@ -22,7 +22,9 @@ deploy() {
 
   printf -v COMMA_ENV "\'%s'," "${ENV[@]}"
   gum confirm "Do you really want to deploy '$JAR_NAME' to environments: ${COMMA_ENV::-1}?" || return 0
-  START_AFTER_DEPLOY=$(gum confirm "Do you want to start '$JAR_NAME' via 'start-app.sh'?")
+
+  START_AFTER_DEPLOY=0
+  gum confirm "Do you want to start '$JAR_NAME' via 'start-app.sh'?" && START_AFTER_DEPLOY=1
 
   for E in "${ENV[@]}"; do
     SSH_HOST=$(yq ".project[] | select (.name == \"$PROJECT\") | .env[] | select (.name == \"$E\") | .host" $CONFIG)
@@ -33,7 +35,7 @@ deploy() {
     DEPLOY_COMMAND="scp -i $SSH_KEY $JAR $SSH_USER@$SSH_HOST:$SSH_PATH/$JAR_NAME"
     echo "$DEPLOY_COMMAND" | bash -x
 
-    if [[ $START_AFTER_DEPLOY -eq 0 ]]; then
+    [[ $START_AFTER_DEPLOY -eq 1 ]] && {
       SSH_START_APP_PATH=$(yq ".project[] | select (.name == \"$PROJECT\") | .env[] | select (.name == \"$E\") | .path.start-app" $CONFIG)
       APP_NAME="${JAR_NAME%%-[0-9]*}"
       APP_VERSION="${JAR_NAME#$APP_NAME-}"
@@ -41,6 +43,6 @@ deploy() {
 
       START_COMMAND="ssh -i $SSH_KEY $SSH_USER@$SSH_HOST $SSH_START_APP_PATH/start-app.sh -n=$APP_NAME -v=$APP_VERSION -f"
       echo "$START_COMMAND" | bash -x
-    fi
+    }
   done
 }
